@@ -31,7 +31,7 @@ def select_action(state):
             return policy_net(state).max(1)[1].view(1, 1)
     else:
         # 进行随机探索，等概率从当前策略集中选出一种策略
-        return torch.LongTensor([[random.randrange(n_actions)]], device=device)
+        return torch.tensor([[random.randrange(n_actions)]], dtype=torch.long, device=device)
 
 
 def optimize_model():
