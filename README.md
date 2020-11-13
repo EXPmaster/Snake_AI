@@ -24,7 +24,7 @@
 4. 运行
 
    ```
-   pythonw 
+   pythonw main.py
    ```
 
 
