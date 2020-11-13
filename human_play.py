@@ -59,7 +59,7 @@ def playgame():
 
         # 旧食物存在时间减1
         food_down_count -= 1
-        get_screen(screen, show_img=False)
+        # get_screen(screen, device='cpu', show_img=False)
         # 游戏结束
         if game_over:
             time.sleep(3)

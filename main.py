@@ -1,2 +1,0 @@
-import pygame as pyg
-

@@ -7,6 +7,10 @@ from objects import Food, Wall, Snake
 import cv2
 import torchvision.transforms as T
 from .image_transform import GrayScale, Resize, Normalize, ToTensor
+import torch
+import torch.optim as optim
+from model.dqn import DQN
+from .memory import ReplayMemory
 
 
 def get_snake_position(snake):
@@ -125,13 +129,14 @@ def draw_scene(screen, snake, food, walls, needs_lines=True):
         for y in range(0, HEIGHT, PIXEL_SIZE):
             pyg.draw.line(screen, BLACK, (0, y), (WIDTH, y), 1)
 
-    pyg.display.update()
+        pyg.display.update()
 
 
-def get_screen(screen, show_img=False):
+def get_screen(screen, device, show_img=False):
     r"""
 
     :param screen: 当前screen
+    :param device: cuda or cpu
     :param show_img: 是否显示图片
     :return: 图片numpy数组，size: WIDTH*HEIGHT*3
     """
@@ -147,4 +152,82 @@ def get_screen(screen, show_img=False):
     if show_img:
         img = cv2.cvtColor(screen_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('test', img)
-    return ret_img
+    return ret_img.unsqueeze(0).to(device)
+
+
+def save_model(model_path, policy_net, target_net, optimizer, memories):
+    r"""保存模型"""
+    print('Saving model... wait...')
+    torch.save(
+        {
+            'dqn': policy_net.state_dict(),
+            'target': target_net.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'memories': memories
+        },
+        model_path
+    )
+    print('Model saved!')
+
+
+def load_model(
+    model_name,
+    screen_height,
+    screen_width,
+    n_actions,
+    device,
+    restart_mem=False,
+    restart_models=False,
+    restart_optim=False,
+    random_clean_memory=False,
+    opt='rmsprop',
+):
+    r""" 读取模型参数、记忆、optimizer等
+
+    :param model_name: 模型文件位置
+    :param screen_height: 输入图片的高度
+    :param screen_width: 输入图片的宽度
+    :param n_actions: 策略数量
+    :param device: cuda or cpu
+    :param restart_mem: 清除所有记忆
+    :param restart_models: 清除模型参数
+    :param restart_optim: 清除optimizer参数
+    :param random_clean_memory: 随机消除记忆
+    :param opt: 选择哪一个optimizer
+    :return: policy net, target net, optimizer, memories
+    """
+    # DQN network
+    policy_net = DQN(screen_height, screen_width, n_actions).to(device)
+    target_net = DQN(screen_height, screen_width, n_actions).to(device)
+    # Optimizer
+    optimizer = None
+    if opt == 'adam':
+        optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
+    elif opt == 'rmsprop':
+        optimizer = optim.RMSprop(
+            policy_net.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM
+        )
+    elif opt == 'sgd':
+        optimizer = optim.SGD(
+            policy_net.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM
+        )
+
+    memories = ReplayMemory(MEMORY_SIZE)
+
+    try:
+        checkpoint = torch.load(model_name, map_location=device)
+        if not restart_models:
+            policy_net.load_state_dict(checkpoint['dqn'])
+            target_net.load_state_dict(checkpoint['target'])
+        if not restart_optim:
+            assert optimizer is not None, 'optimizer illegal'
+            optimizer.load_state_dict(checkpoint['optimizer'])
+        if not restart_mem:
+            memories = checkpoint['memories']
+            if random_clean_memory:
+                memories.random_clean_memory(MEM_CLEAN_SIZE)
+        print('Models loaded!')
+    except Exception as e:
+        print(f"Couldn't load Models! => {e}")
+        print('Here we go with a new one!')
+    return policy_net, target_net, optimizer, memories

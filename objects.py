@@ -92,6 +92,20 @@ class Snake:
     def head(self):
         return self.snake_queue[-1]
 
+    def choose_movement(self, key):
+        r"""通过神经网络输出的action来选择移动方向，为0
+        则蛇头左转，为1则蛇头不动，为2则蛇头右转
+
+        :param key: 策略网络输出的action index
+        :return: None
+        """
+        if key == 0:
+            # 蛇头左转
+            self.head().direction = (self.head().direction + 1) % 4
+        elif key == 2:
+            # 蛇头右转
+            self.head().direction = (self.head().direction - 1) % 4
+
     def move(self):
         r"""移动"""
         snake_tail = self.snake_queue.pop(0)
