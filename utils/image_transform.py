@@ -44,5 +44,6 @@ class ToTensor:
         # numpy image: H x W x C ->
         # torch image: C X H X W
         img = img.transpose((2, 0, 1))
+        img = img.astype(np.float32)
         return torch.from_numpy(img)
 

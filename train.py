@@ -6,12 +6,14 @@ from utils.memory import Transition, ReplayMemory
 import torch
 from utils.utils import init_game_state, gen_walls, gen_food, \
     get_screen, draw_scene, load_model, save_model
-from model.dqn import DQN
-import torch.optim as optim
 import torch.nn as nn
 import random
 import math
 from itertools import count
+import numpy as np
+import logging
+import time
+import os
 
 
 def select_action(state):
@@ -38,7 +40,7 @@ def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
     transitions = memory.sample(BATCH_SIZE)  # 从记忆中采样一组数据
-    batch = Transition(*zip(transitions))  # 将一个批次的Transition变成一个Transition批次，每个key有一个batch size的数据
+    batch = Transition(*zip(*transitions))  # 将一个批次的Transition变成一个Transition批次，每个key有一个batch size的数据
 
     # 选出下一个状态不是游戏结束状态
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)),
@@ -58,7 +60,8 @@ def optimize_model():
 
     # 计算Q值（带衰减因子gamma）
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(0))
+    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+    acc_loss.append(loss.item())
 
     # 更新网络
     optimizer.zero_grad()
@@ -72,6 +75,7 @@ def train():
     r"""训练"""
     global screen, food, food_down_count, game_over
     draw_scene(screen, snake, food, walls, needs_lines=False)
+    t_reward = []
     for t in count():
         # 获取当前状态
         state = get_screen(screen, device=device)
@@ -102,8 +106,13 @@ def train():
         if reward == 0:
             reward = SNAKE_ALIVE_REWARD
 
+        t_reward.append(reward)
         reward = torch.tensor([reward], device=device)
+
         if game_over:
+            snake_len.append(len(snake))
+            acc_reward.append(np.sum(t_reward))
+            t_reward = []
             next_state = None
         else:
             draw_scene(screen, snake, food, walls, needs_lines=False)
@@ -120,9 +129,28 @@ def train():
 
 
 if __name__ == '__main__':
-    show_screen = True
+    # 配置logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    rq = time.strftime(r'%Y%m%d%H%M', time.localtime(time.time()))
+    log_path = './logs/'
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+    log_name = log_path + rq + '.log'
+    logfile = log_name
+    fh = logging.FileHandler(logfile, 'w')
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    fh.setLevel(logging.INFO)
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    show_screen = False
     screen_size = (WIDTH, HEIGHT)
     n_actions = 3  # 对应3种策略，0表示蛇头左转，1表示不动，2表示蛇头右转
+    acc_loss = []  # 累计loss
+    acc_reward = []  # 累计reward
+    snake_len = []  # 蛇长
     # 配置
     options = {
         'restart_mem': False,
@@ -144,6 +172,8 @@ if __name__ == '__main__':
     # 初始化生成蛇、食物、墙
     snake, food = init_game_state()
     walls = gen_walls()
+    game_over = False
+    food_down_count = FOOD_VALID_STEPS
 
     clock = pyg.time.Clock()
 
@@ -159,16 +189,48 @@ if __name__ == '__main__':
 
     # 初始化学习率
     for param_group in optimizer.param_groups:
-        if param_group['lr'] != LEARNING_RATE:
-            param_group['lr'] = LEARNING_RATE
+        if param_group['lr'] != BEGIN_LR:
+            param_group['lr'] = BEGIN_LR
             break
 
     steps_done = 0
+
+    # 训练模型主循环
     for episode in range(NUM_EPISODES):
-        food_down_count = FOOD_VALID_STEPS
-        game_over = False
+        if (steps_done + 1) % 5000 == 0:
+            # Decay learning rate
+            for param_group in optimizer.param_groups:
+                if param_group['lr'] > LEARNING_RATE:
+                    param_group['lr'] = np.round(param_group['lr'] * 0.97, 10)
+                    break
+
         train()
-        snake, food = init_game_state()
-        if episode % TARGET_UPDATE == 0:
+        if game_over:
+            game_over = False
+            snake, food = init_game_state()
+            food_down_count = FOOD_VALID_STEPS
+
+        # 更新target net
+        if (episode + 1) % TARGET_UPDATE == 0:
+
+            logger.info('*' * 20)
+            logger.info(f'Episodes done {episode + 1}')
+            logger.info(f'Batch size: {BATCH_SIZE}')
+            logger.info(f'Average snake length per episode: {np.mean(snake_len)}')
+            logger.info(f'Average reward per episode {np.mean(acc_reward)}')
+            logger.info(f'Average loss: {np.mean(acc_loss)}')
+            logger.info(f'Memory length: {len(memory)}')
+            for param_group in optimizer.param_groups:
+                logger.info(f"learning rate={param_group['lr']}")
+                break
+            logger.info('Optimizer: {}'.format(optimizer.__class__.__name__))
+            acc_loss = []  # 累计loss
+            acc_reward = []  # 累计reward
+            snake_len = []  # 蛇长
+
+            print('updating target net')
             target_net.load_state_dict(policy_net.state_dict())
 
+        # 保存模型参数及记忆
+        if (episode + 1) % SAVE_MODEL_STEPS == 0:
+            save_model(MODEL_PATH, policy_net, target_net, optimizer, memory)

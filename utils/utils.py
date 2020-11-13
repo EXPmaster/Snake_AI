@@ -11,6 +11,7 @@ import torch
 import torch.optim as optim
 from model.dqn import DQN
 from .memory import ReplayMemory
+import os
 
 
 def get_snake_position(snake):
@@ -158,6 +159,9 @@ def get_screen(screen, device, show_img=False):
 def save_model(model_path, policy_net, target_net, optimizer, memories):
     r"""保存模型"""
     print('Saving model... wait...')
+    model_root = './weights'
+    if not os.path.exists(model_root):
+        os.mkdir(model_root)
     torch.save(
         {
             'dqn': policy_net.state_dict(),

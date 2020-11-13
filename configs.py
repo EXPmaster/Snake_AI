@@ -15,11 +15,12 @@ MODEL_PATH = './weights/dqn.pt'  # 模型位置
 BATCH_SIZE = 128  # 批大小
 MEMORY_SIZE = 10000  # 记忆容量
 MEM_CLEAN_SIZE = 5000  # 随机清除记忆的数量
-LEARNING_RATE = 1e-4  # 学习率
+BEGIN_LR = 1e-3  # 初始化大学习率
+LEARNING_RATE = 1e-5  # 学习率
 MOMENTUM = 0.9  # 动量
 
 EAT_FOOD_REWARD = 1.0  # 吃食物的奖励
-DIE_REWARD = -10.0  # 死亡惩罚
+DIE_REWARD = -1.0  # 死亡惩罚
 SNAKE_ALIVE_REWARD = -1e-3  # 苟活惩罚
 
 # 采用epsilon贪心策略时，用于确定探索概率的参数
@@ -29,7 +30,8 @@ EPS_DECAY = 200
 
 GAMMA = 0.999  # 用于计算折扣回报的折扣参数
 TARGET_UPDATE = 10  # 更新target net 的频率
-NUM_EPISODES = 2000  # 总共进行的游戏轮数
+NUM_EPISODES = 200_0000  # 总共进行的游戏轮数
+SAVE_MODEL_STEPS = 50  # 保存模型的频率
 """ ---------------- colors -----------------"""
 BLACK = [0, 0, 0]
 GRAY = [128, 128, 128]
