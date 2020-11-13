@@ -9,19 +9,26 @@
    ```
    conda create -n snake python=3.7 -y
    ```
+   
 2. 激活环境
 
    ```
    conda activate snake
    ```
 
-3. 安装依赖包
+3. 安装pytorch, torchvision
+
+   ```
+   conda install pytorch torchvision -c pytorch
+   ```
+
+4. 安装依赖包
 
    ```
    pip install -r requirements.txt
    ```
 
-4. 运行
+5. 运行
 
    ```
    pythonw main.py

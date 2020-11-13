@@ -4,6 +4,9 @@ import pygame as pyg
 from configs import *
 import numpy as np
 from objects import Food, Wall, Snake
+import cv2
+import torchvision.transforms as T
+from .image_transform import GrayScale, Resize, Normalize, ToTensor
 
 
 def get_snake_position(snake):
@@ -123,3 +126,25 @@ def draw_scene(screen, snake, food, walls, needs_lines=True):
             pyg.draw.line(screen, BLACK, (0, y), (WIDTH, y), 1)
 
     pyg.display.update()
+
+
+def get_screen(screen, show_img=False):
+    r"""
+
+    :param screen: 当前screen
+    :param show_img: 是否显示图片
+    :return: 图片numpy数组，size: WIDTH*HEIGHT*3
+    """
+    screen_img = np.rot90(pyg.surfarray.array3d(screen))[::-1]  # 调换使图片显示正确
+    # image transformation
+    tsfm = T.Compose([
+        Resize(84),
+        Normalize(),
+        ToTensor()
+    ])
+    ret_img = tsfm(screen_img)
+
+    if show_img:
+        img = cv2.cvtColor(screen_img, cv2.COLOR_RGB2BGR)
+        cv2.imshow('test', img)
+    return ret_img

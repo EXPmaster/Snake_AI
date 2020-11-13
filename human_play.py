@@ -5,7 +5,7 @@ import pygame as pyg
 import sys
 from pygame.locals import *
 from configs import *
-from utils import init_game_state, gen_walls, gen_food, draw_scene
+from utils.utils import init_game_state, gen_walls, draw_scene, get_screen, gen_food
 import time
 
 
@@ -37,7 +37,6 @@ def playgame():
                     snake.head().direction = KEY['LEFT']
                 elif event.key == K_RIGHT and snake.head().direction != KEY['LEFT']:
                     snake.head().direction = KEY['RIGHT']
-
         snake.move()
         # 蛇撞墙了
         if snake.hits_wall(walls):
@@ -55,13 +54,12 @@ def playgame():
         if not food or food_down_count == 0:
             food = gen_food(snake)
             food_down_count = FOOD_VALID_STEPS
-
         # 绘制场景
         draw_scene(screen, snake, food, walls, needs_lines=True)
 
         # 旧食物存在时间减1
         food_down_count -= 1
-
+        get_screen(screen, show_img=False)
         # 游戏结束
         if game_over:
             time.sleep(3)
