@@ -130,11 +130,11 @@ def draw_scene(screen, snake, food, walls, needs_lines=True):
         for y in range(0, HEIGHT, PIXEL_SIZE):
             pyg.draw.line(screen, BLACK, (0, y), (WIDTH, y), 1)
 
-        pyg.display.update()
+        # pyg.display.update()
 
 
 def get_screen(screen, device, show_img=False):
-    r"""
+    r""" 获取当前游戏状态
 
     :param screen: 当前screen
     :param device: cuda or cpu
@@ -153,6 +153,7 @@ def get_screen(screen, device, show_img=False):
     if show_img:
         img = cv2.cvtColor(screen_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('test', img)
+        # cv2.imwrite('./tmp.jpg', img)
     return ret_img.unsqueeze(0).to(device)
 
 
@@ -235,3 +236,40 @@ def load_model(
         print(f"Couldn't load Models! => {e}")
         print('Here we go with a new one!')
     return policy_net, target_net, optimizer, memories
+
+
+def save_model_only(model_path, save_path):
+    r"""读取模型并只保存策略网络的参数，用于自动运行游戏
+
+    :param model_path: 模型位置
+    :param save_path: 保存位置
+    :return: None
+    """
+    checkpoint = torch.load(model_path, map_location='cpu')
+    policy_state_dict = checkpoint['dqn']
+    torch.save(policy_state_dict, save_path)
+
+
+def load_model_only(
+    model_name,
+    screen_height,
+    screen_width,
+    n_actions,
+    device
+):
+    r""" 仅读取策略网络，用于AI玩游戏
+
+    :param model_name: 模型文件
+    :param screen_height: 屏幕高度
+    :param screen_width: 屏幕宽度
+    :param n_actions: 策略数
+    :param device: cuda or cpu
+    :return: policy net
+    """
+    with torch.no_grad():
+        policy_net = DQN(screen_height, screen_width, n_actions).to(device)
+        checkpoint = torch.load(model_name, map_location=device)
+        policy_net.load_state_dict(checkpoint)
+    policy_net.eval()
+
+    return policy_net

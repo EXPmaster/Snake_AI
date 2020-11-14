@@ -28,7 +28,7 @@ class ReplayMemory:
         r"""sample memory"""
         return random.sample(self.memory, batch_size)
 
-    def random_clear_memory(self, clear_size):
+    def random_clean_memory(self, clear_size):
         r"""随机清除记忆"""
         if clear_size < len(self.memory):
             self.memory = random.sample(self.memory, clear_size)

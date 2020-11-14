@@ -73,46 +73,59 @@ def optimize_model():
 
 def train():
     r"""训练"""
-    global screen, food, food_down_count, game_over
+    global screen, food
+    food_down_count = FOOD_VALID_STEPS
     draw_scene(screen, snake, food, walls, needs_lines=False)
     t_reward = []
+    game_over = False
     for t in count():
+        reward = 0
         # 获取当前状态
         state = get_screen(screen, device=device)
-        reward = 0
-        action = select_action(state)
-        # snake move
-        key = action.item()
-        snake.choose_movement(key)
-        snake.move()
+        # 计算蛇头与食物之间的曼哈顿距离
+        distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
+
         # 蛇撞墙了
         if snake.hits_wall(walls):
             reward = DIE_REWARD
             game_over = True
         # 蛇吃了自己
-        if snake.eats_itself():
+        elif snake.eats_itself():
             reward = DIE_REWARD
             game_over = True
         # 蛇生长
-        if snake.eats_food(food):
+        elif snake.eats_food(food):
             reward = EAT_FOOD_REWARD
             snake.grow()
             food = None
+        # snake move
+        action = select_action(state)
+        key = action.item()
+        snake.choose_movement(key)
+        snake.move()
+
+        # 蛇没吃到食物且没有死亡
+        if reward == 0.:
+            # 计算蛇头与食物之间的曼哈顿距离
+            next_distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
+            if next_distance - distance < 0:
+                # 距离缩短
+                reward = SNAKE_CLOSE_TO_FOOD_REWARD
+            elif next_distance - distance > 0:
+                # 距离拉长
+                reward = SNAKE_AWAY_FROM_FOOD_REWARD
+            else:
+                reward = 0.0
+
+        t_reward.append(reward)
+        reward = torch.tensor([reward], dtype=torch.float, device=device)
+
         # 生成新食物
         if not food or food_down_count == 0:
             food = gen_food(snake)
             food_down_count = FOOD_VALID_STEPS
-        # 蛇没吃到食物且没有死亡
-        if reward == 0:
-            reward = SNAKE_ALIVE_REWARD
-
-        t_reward.append(reward)
-        reward = torch.tensor([reward], device=device)
 
         if game_over:
-            snake_len.append(len(snake))
-            acc_reward.append(np.sum(t_reward))
-            t_reward = []
             next_state = None
         else:
             draw_scene(screen, snake, food, walls, needs_lines=False)
@@ -122,8 +135,13 @@ def train():
         memory.push(state, action, next_state, reward)
         # 更新policy net
         optimize_model()
+        # 超时退出
+        if t > MAX_STEP:
+            game_over = True
 
         if game_over:
+            snake_len.append(len(snake))
+            acc_reward.append(np.sum(t_reward))
             return
         food_down_count -= 1
 
@@ -147,7 +165,8 @@ if __name__ == '__main__':
 
     show_screen = False
     screen_size = (WIDTH, HEIGHT)
-    n_actions = 3  # 对应3种策略，0表示蛇头左转，1表示不动，2表示蛇头右转
+    # n_actions = 3  # 对应4种策略，0表示蛇头左转，1表示不动，2表示蛇头右转
+    n_actions = 4  # 对应4种策略，上下左右
     acc_loss = []  # 累计loss
     acc_reward = []  # 累计reward
     snake_len = []  # 蛇长
@@ -157,7 +176,7 @@ if __name__ == '__main__':
         'restart_models': False,
         'restart_optim': False,
         'random_clean_memory': True,
-        'opt': 'rmsprop'
+        'opt': 'adam'
     }
 
     pyg.init()
@@ -172,11 +191,8 @@ if __name__ == '__main__':
     # 初始化生成蛇、食物、墙
     snake, food = init_game_state()
     walls = gen_walls()
-    game_over = False
-    food_down_count = FOOD_VALID_STEPS
 
     clock = pyg.time.Clock()
-
     init_screen = get_screen(screen, device)
     _, _, screen_height, screen_width = init_screen.shape
     # 初始化神经网络
@@ -197,18 +213,15 @@ if __name__ == '__main__':
 
     # 训练模型主循环
     for episode in range(NUM_EPISODES):
-        if (steps_done + 1) % 5000 == 0:
+        if (episode + 1) % 200 == 0:
             # Decay learning rate
             for param_group in optimizer.param_groups:
                 if param_group['lr'] > LEARNING_RATE:
-                    param_group['lr'] = np.round(param_group['lr'] * 0.97, 10)
+                    param_group['lr'] = np.round(param_group['lr'] * 0.8, 10)
                     break
 
         train()
-        if game_over:
-            game_over = False
-            snake, food = init_game_state()
-            food_down_count = FOOD_VALID_STEPS
+        snake, food = init_game_state()
 
         # 更新target net
         if (episode + 1) % TARGET_UPDATE == 0:
