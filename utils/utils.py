@@ -98,7 +98,7 @@ def init_game_state():
     return snake, food
 
 
-def draw_scene(screen, snake, food, walls, needs_lines=True):
+def draw_scene(screen, snake, food, walls, needs_lines=True, play_game=False):
     r"""绘制场景
 
     :param screen: screen
@@ -106,6 +106,7 @@ def draw_scene(screen, snake, food, walls, needs_lines=True):
     :param food: 食物
     :param walls: 墙
     :param needs_lines: 是否需要画线
+    :param play_game: 是否玩游戏
     :return: None
     """
     screen.fill(BLACK)
@@ -130,7 +131,8 @@ def draw_scene(screen, snake, food, walls, needs_lines=True):
         for y in range(0, HEIGHT, PIXEL_SIZE):
             pyg.draw.line(screen, BLACK, (0, y), (WIDTH, y), 1)
 
-        # pyg.display.update()
+    if play_game:
+        pyg.display.update()
 
 
 def get_screen(screen, device, show_img=False):
@@ -248,6 +250,7 @@ def save_model_only(model_path, save_path):
     checkpoint = torch.load(model_path, map_location='cpu')
     policy_state_dict = checkpoint['dqn']
     torch.save(policy_state_dict, save_path)
+    print('reduce model saved!')
 
 
 def load_model_only(
@@ -271,5 +274,6 @@ def load_model_only(
         checkpoint = torch.load(model_name, map_location=device)
         policy_net.load_state_dict(checkpoint)
     policy_net.eval()
+    print('model loaded!')
 
     return policy_net

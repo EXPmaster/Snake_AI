@@ -55,7 +55,7 @@ def playgame():
             food = gen_food(snake)
             food_down_count = FOOD_VALID_STEPS
         # 绘制场景
-        draw_scene(screen, snake, food, walls, needs_lines=True)
+        draw_scene(screen, snake, food, walls, needs_lines=True, play_game=True)
 
         # 旧食物存在时间减1
         food_down_count -= 1

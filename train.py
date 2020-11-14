@@ -85,6 +85,13 @@ def train():
         # 计算蛇头与食物之间的曼哈顿距离
         distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
 
+        # snake move
+        action = select_action(state)
+        key = action.item()
+        snake.choose_movement(key)
+        snake.move()
+
+        # get reward from next state
         # 蛇撞墙了
         if snake.hits_wall(walls):
             reward = DIE_REWARD
@@ -98,14 +105,9 @@ def train():
             reward = EAT_FOOD_REWARD
             snake.grow()
             food = None
-        # snake move
-        action = select_action(state)
-        key = action.item()
-        snake.choose_movement(key)
-        snake.move()
 
         # 蛇没吃到食物且没有死亡
-        if reward == 0.:
+        if reward == 0:
             # 计算蛇头与食物之间的曼哈顿距离
             next_distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
             if next_distance - distance < 0:
@@ -217,7 +219,7 @@ if __name__ == '__main__':
             # Decay learning rate
             for param_group in optimizer.param_groups:
                 if param_group['lr'] > LEARNING_RATE:
-                    param_group['lr'] = np.round(param_group['lr'] * 0.8, 10)
+                    param_group['lr'] = np.round(param_group['lr'] * 0.5, 10)
                     break
 
         train()

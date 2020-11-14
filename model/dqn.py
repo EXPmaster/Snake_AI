@@ -31,6 +31,7 @@ class DQN(nn.Module):
         self.head = nn.Linear(linear_input_size, outputs)
 
     def forward(self, x):
+        r"""前向传播"""
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.relu(self.bn2(self.conv2(x)))
         x = self.relu(self.bn3(self.conv3(x)))
