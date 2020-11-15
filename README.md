@@ -1,7 +1,7 @@
 ### 贪吃蛇AI
 
 #### 项目简介
-本项目是基于强化学习实现的一个贪吃蛇AI
+本项目是基于深度强化学习（DDQN）实现的一个贪吃蛇AI
 
 #### Installation
 1. 新建Anaconda虚拟环境
@@ -31,7 +31,7 @@
 5. 运行
 
    ```
-   pythonw main.py
+   python agent_play.py
    ```
 
 
