@@ -13,7 +13,7 @@ def main():
     pyg.init()
     screen = pyg.display.set_mode((WIDTH, HEIGHT))
     # screen = pyg.Surface((WIDTH, HEIGHT))
-    # pyg.display.set_caption('Snake AI Play')
+    pyg.display.set_caption('Snake AI Play')
     clock = pyg.time.Clock()
     font = pyg.font.Font(None, 20)
     n_actions = 4
@@ -34,9 +34,10 @@ def main():
         print(e)
         save_model_only(MODEL_PATH, PLAY_MODEL_PATH)
         policy_net = load_model_only(PLAY_MODEL_PATH, screen_height, screen_width, n_actions, device)
+    score = 0
+    draw_scene(screen, snake, food, walls, needs_lines=False, play_game=True)
 
     while True:
-        score = 0
         clock.tick(PLAY_FPS)  # 延时
         for event in pyg.event.get():
             if event.type == QUIT:
@@ -51,12 +52,6 @@ def main():
             snake, food = init_game_state()
             food_down_count = FOOD_VALID_STEPS
 
-        # 生成新食物
-        if not food or food_down_count == 0:
-            food = gen_food(snake)
-            food_down_count = FOOD_VALID_STEPS
-
-        draw_scene(screen, snake, food, walls, needs_lines=False, play_game=True)
         state = get_screen(screen, device)
         action = policy_net(state).max(1)[1].view(1, 1)
 
@@ -76,6 +71,12 @@ def main():
             snake.grow()
             food = None
 
+        # 生成新食物
+        if not food or food_down_count == 0:
+            food = gen_food(snake)
+            food_down_count = FOOD_VALID_STEPS
+
+        draw_scene(screen, snake, food, walls, needs_lines=False, play_game=True)
         food_down_count -= 1
 
 

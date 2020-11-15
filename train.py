@@ -2,10 +2,10 @@
 
 from configs import *
 import pygame as pyg
-from utils.memory import Transition, ReplayMemory
+from utils.memory import Transition
 import torch
 from utils.utils import init_game_state, gen_walls, gen_food, \
-    get_screen, draw_scene, load_model, save_model
+    get_screen, draw_scene, load_model, save_model, save_model_only
 import torch.nn as nn
 import random
 import math
@@ -21,13 +21,14 @@ def select_action(state):
     还是进行探索"""
     global steps_done
     sample = random.random()
+    # 设置阈值，随着训练轮次增大，agent的行动会愈加趋向保守，即进行探索的概率会降低
     eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1 * steps_done / EPS_DECAY)
+                    math.exp(-1 * steps_done / EPS_DECAY)
     steps_done += 1
     if sample > eps_threshold:
         # 若随机数大于阈值，则采用贪心方案，采取当前回报最大的策略
         with torch.no_grad():
-            # 选出回报最大的策略对应的索引
+            # 选出回报最大的策略对应的索引，代表采取的行动
             return policy_net(state).max(1)[1].view(1, 1)
     else:
         # 进行随机探索，等概率从当前策略集中选出一种策略
@@ -37,9 +38,13 @@ def select_action(state):
 def optimize_model():
     r"""优化模型"""
     # 当记忆不足batch size时，不更新策略网络
-    if len(memory) < BATCH_SIZE:
+    transitions = []
+    for memory in [short_memory, good_memory, bad_memory]:
+        transitions += memory.sample(BATCH_SIZE)
+    size = len(transitions)
+    if size < BATCH_SIZE:
         return
-    transitions = memory.sample(BATCH_SIZE)  # 从记忆中采样一组数据
+    transitions = random.sample(transitions, BATCH_SIZE)  # 从记忆中采样一组数据
     batch = Transition(*zip(*transitions))  # 将一个批次的Transition变成一个Transition批次，每个key有一个batch size的数据
 
     # 选出下一个状态不是游戏结束状态
@@ -51,15 +56,16 @@ def optimize_model():
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
 
-    # 计算Q(s,a)
+    # 使用策略网络计算Q(s,a)，代表采取行动a获得的实际累计回报
     state_action_values = policy_net(state_batch).gather(1, action_batch)
 
-    # 计算V(s')
+    # 计算Q(s')，为根据经验（target net）获得的下一状态（即采取行动a之后跳转到的状态）的累计回报
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     next_state_values[non_final_mask] = target_net(non_final_next_state).max(1)[0].detach()
 
-    # 计算Q值（带衰减因子gamma）
+    # 计算经验下的Q(s,a)值，为r + gamma * Q(s',a')，gamma表示衰减因子
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+    # 根据经验来更新对Q的估计
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
     acc_loss.append(loss.item())
 
@@ -120,7 +126,7 @@ def train():
                 reward = 0.0
 
         t_reward.append(reward)
-        reward = torch.tensor([reward], dtype=torch.float, device=device)
+        reward_tensor = torch.tensor([reward], dtype=torch.float, device=device)
 
         # 生成新食物
         if not food or food_down_count == 0:
@@ -134,7 +140,14 @@ def train():
             next_state = get_screen(screen, device=device)
 
         # 保存状态
-        memory.push(state, action, next_state, reward)
+        if not game_over:
+            if reward >= EAT_FOOD_REWARD:
+                good_memory.push(state, action, next_state, reward_tensor)
+            else:
+                short_memory.push(state, action, next_state, reward_tensor)
+        else:
+            bad_memory.push(state, action, next_state, reward_tensor)
+
         # 更新policy net
         optimize_model()
         # 超时退出
@@ -198,12 +211,16 @@ if __name__ == '__main__':
     init_screen = get_screen(screen, device)
     _, _, screen_height, screen_width = init_screen.shape
     # 初始化神经网络
-    policy_net, target_net, optimizer, memory = load_model(MODEL_PATH, screen_height,
-                                                           screen_width, n_actions, device,
-                                                           **options)
+    policy_net, target_net, optimizer, memories = load_model(MODEL_PATH, screen_height,
+                                                             screen_width, n_actions, device,
+                                                             **options)
     target_net.load_state_dict(policy_net.state_dict())
     target_net.eval()
     criterion = nn.SmoothL1Loss()
+    # 初始化记忆单元
+    short_memory = memories['short']
+    good_memory = memories['good']
+    bad_memory = memories['bad']
 
     # 初始化学习率
     for param_group in optimizer.param_groups:
@@ -234,7 +251,10 @@ if __name__ == '__main__':
             logger.info(f'Average snake length per episode: {np.mean(snake_len)}')
             logger.info(f'Average reward per episode {np.mean(acc_reward)}')
             logger.info(f'Average loss: {np.mean(acc_loss)}')
-            logger.info(f'Memory length: {len(memory)}')
+            logger.info('Memories:')
+            logger.info('  - short: {}'.format(len(short_memory)))
+            logger.info('  - good: {}'.format(len(good_memory)))
+            logger.info('  - bad: {}'.format(len(bad_memory)))
             for param_group in optimizer.param_groups:
                 logger.info(f"learning rate={param_group['lr']}")
                 break
@@ -248,4 +268,10 @@ if __name__ == '__main__':
 
         # 保存模型参数及记忆
         if (episode + 1) % SAVE_MODEL_STEPS == 0:
-            save_model(MODEL_PATH, policy_net, target_net, optimizer, memory)
+            memories = {
+                'short': short_memory,
+                'good': good_memory,
+                'bad': bad_memory
+            }
+            save_model(MODEL_PATH, policy_net, target_net, optimizer, memories)
+            save_model_only(MODEL_PATH, PLAY_MODEL_PATH)

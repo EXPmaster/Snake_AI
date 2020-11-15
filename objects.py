@@ -85,6 +85,7 @@ class Snake:
             next_x = next_x - PIXEL_SIZE
             self.snake_queue.insert(0, BasicPixel(next_x, y, self.body_color, direction=KEY['RIGHT']))
         self.movement = PIXEL_SIZE  # 运动步长
+        self.tmp_tail = None  # 存储蛇尾，用于吃食物长长
 
     def __len__(self):
         return len(self.snake_queue)
@@ -117,6 +118,8 @@ class Snake:
     def move(self):
         r"""移动"""
         snake_tail = self.snake_queue.pop(0)
+        tmp_tail = BasicPixel(snake_tail.x, snake_tail.y, snake_tail.color)
+        self.tmp_tail = tmp_tail
         snake_head = self.head()
         snake_head.color = self.body_color
         if snake_head.direction == KEY['UP']:
@@ -139,10 +142,11 @@ class Snake:
 
     def grow(self):
         r"""蛇吃食物长长"""
-        x = self.snake_queue[0].x
-        y = self.snake_queue[0].y
-        color = self.body_color
-        self.snake_queue.insert(0, BasicPixel(x, y, color))
+        # x = self.snake_queue[0].x
+        # y = self.snake_queue[0].y
+        # color = self.body_color
+        # self.snake_queue.insert(0, BasicPixel(x, y, color))
+        self.snake_queue.insert(0, self.tmp_tail)
 
     def eats_itself(self):
         r"""判断蛇是否撞上自己

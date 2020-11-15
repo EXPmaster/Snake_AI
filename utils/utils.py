@@ -146,7 +146,7 @@ def get_screen(screen, device, show_img=False):
     screen_img = np.rot90(pyg.surfarray.array3d(screen))[::-1]  # 调换使图片显示正确
     # image transformation
     tsfm = T.Compose([
-        Resize(84),
+        Resize(64),
         Normalize(),
         ToTensor()
     ])
@@ -219,7 +219,12 @@ def load_model(
             policy_net.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM
         )
 
-    memories = ReplayMemory(MEMORY_SIZE)
+    # memories = ReplayMemory(MEMORY_SIZE)
+    memories = {
+        'short': ReplayMemory(MEMORY_SIZE),
+        'good': ReplayMemory(MEMORY_SIZE),
+        'bad': ReplayMemory(MEMORY_SIZE//2),
+    }
 
     try:
         checkpoint = torch.load(model_name, map_location=device)
@@ -232,7 +237,9 @@ def load_model(
         if not restart_mem:
             memories = checkpoint['memories']
             if random_clean_memory:
-                memories.random_clean_memory(MEM_CLEAN_SIZE)
+                memories['short'].random_clean_memory(MEM_CLEAN_SIZE)
+                memories['good'].random_clean_memory(MEM_CLEAN_SIZE)
+                memories['bad'].random_clean_memory(MEM_CLEAN_SIZE//2)
         print('Models loaded!')
     except Exception as e:
         print(f"Couldn't load Models! => {e}")
