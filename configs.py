@@ -7,7 +7,7 @@ WIDTH, HEIGHT = 150, 150  # 画布宽、高
 PIXEL_SIZE = 10  # 单个网格大小
 SNAKE_POS_X, SNAKE_POS_Y = 70, 70  # 蛇初始位置
 SNAKE_INIT_LEN = 3  # 蛇初始长度
-PLAY_FPS = 1  # 帧率
+PLAY_FPS = 10  # 帧率
 FOOD_VALID_STEPS = 50  # 食物消失的步数
 MODEL_PATH = './weights/dqn2.pt'  # 用于训练的模型位置
 PLAY_MODEL_PATH = './weights/dqn2_reduced.pt'  # 用来玩的模型的位置
@@ -21,10 +21,11 @@ LEARNING_RATE = 1e-6  # 学习率
 MOMENTUM = 0.9  # 动量
 MAX_STEP = 10_0000  # 每一幕的最大行动步数
 
-EAT_FOOD_REWARD = 0.1  # 吃食物的奖励
+EAT_FOOD_REWARD = 0.5  # 吃食物的奖励
 DIE_REWARD = -1.0  # 死亡惩罚
-SNAKE_CLOSE_TO_FOOD_REWARD = 0.01  # 蛇接近食物奖励
-SNAKE_AWAY_FROM_FOOD_REWARD = -0.01 - 1e-4  # 蛇远离食物惩罚
+SNAKE_CLOSE_TO_FOOD_REWARD = 0.04  # 蛇接近食物奖励
+SNAKE_AWAY_FROM_FOOD_REWARD = -0.06  # 蛇远离食物惩罚
+FOOD_DISAPPEAR_REWARD = -0.2  # 蛇在限定时间内没有吃到食物的惩罚
 
 # 采用epsilon贪心策略时，用于确定探索概率的参数
 EPS_START = 0.9

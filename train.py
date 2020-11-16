@@ -84,6 +84,7 @@ def train():
     draw_scene(screen, snake, food, walls, needs_lines=False)
     t_reward = []
     game_over = False
+    eaten = False
     for t in count():
         reward = 0
         # 获取当前状态
@@ -108,22 +109,27 @@ def train():
             game_over = True
         # 蛇生长
         elif snake.eats_food(food):
+            eaten = True
             reward = EAT_FOOD_REWARD
             snake.grow()
             food = None
 
         # 蛇没吃到食物且没有死亡
         if reward == 0:
-            # 计算蛇头与食物之间的曼哈顿距离
-            next_distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
-            if next_distance - distance < 0:
-                # 距离缩短
-                reward = SNAKE_CLOSE_TO_FOOD_REWARD
-            elif next_distance - distance > 0:
-                # 距离拉长
-                reward = SNAKE_AWAY_FROM_FOOD_REWARD
+            if food_down_count == 0:
+                # 食物消失
+                reward = FOOD_DISAPPEAR_REWARD
             else:
-                reward = 0.0
+                # 计算蛇头与食物之间的曼哈顿距离
+                next_distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
+                if next_distance < distance:
+                    # 距离缩短
+                    reward = SNAKE_CLOSE_TO_FOOD_REWARD
+                elif next_distance > distance:
+                    # 距离拉长
+                    reward = SNAKE_AWAY_FROM_FOOD_REWARD
+                else:
+                    reward = 0.0
 
         t_reward.append(reward)
         reward_tensor = torch.tensor([reward], dtype=torch.float, device=device)
@@ -133,8 +139,10 @@ def train():
             food = gen_food(snake)
             food_down_count = FOOD_VALID_STEPS
 
-        if game_over:
+        if game_over or eaten:
             next_state = None
+            if eaten:
+                eaten = False
         else:
             draw_scene(screen, snake, food, walls, needs_lines=False)
             next_state = get_screen(screen, device=device)
@@ -151,8 +159,8 @@ def train():
         # 更新policy net
         optimize_model()
         # 超时退出
-        if t > MAX_STEP:
-            game_over = True
+        # if t > MAX_STEP:
+        #     game_over = True
 
         if game_over:
             snake_len.append(len(snake))
@@ -187,10 +195,10 @@ if __name__ == '__main__':
     snake_len = []  # 蛇长
     # 配置
     options = {
-        'restart_mem': False,
+        'restart_mem': True,
         'restart_models': False,
         'restart_optim': False,
-        'random_clean_memory': True,
+        'random_clean_memory': False,
         'opt': 'adam'
     }
 
