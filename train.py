@@ -19,12 +19,11 @@ import os
 def select_action(state):
     r"""根据策略网络选择策略，采用epsilon贪心，使用概率控制采用贪心方式
     还是进行探索"""
-    global steps_done
+    steps_done = episode
     sample = random.random()
     # 设置阈值，随着训练轮次增大，agent的行动会愈加趋向保守，即进行探索的概率会降低
     eps_threshold = EPS_END + (EPS_START - EPS_END) * \
                     math.exp(-1 * steps_done / EPS_DECAY)
-    steps_done += 1
     if sample > eps_threshold:
         # 若随机数大于阈值，则采用贪心方案，采取当前回报最大的策略
         with torch.no_grad():
@@ -63,9 +62,9 @@ def optimize_model():
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     next_state_values[non_final_mask] = target_net(non_final_next_state).max(1)[0].detach()
 
-    # 计算经验下的Q(s,a)值，为r + gamma * Q(s',a')，gamma表示衰减因子
+    # 计算Q(s,a)值，为r + gamma * Q(s',a')，gamma表示衰减因子
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-    # 根据经验来更新对Q的估计
+    # 根据当前的实际Q来更新经验
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
     acc_loss.append(loss.item())
 
@@ -81,16 +80,16 @@ def train():
     r"""训练"""
     global screen, food
     food_down_count = FOOD_VALID_STEPS
-    draw_scene(screen, snake, food, walls, needs_lines=False)
     t_reward = []
     game_over = False
     eaten = False
     for t in count():
         reward = 0
         # 获取当前状态
+        draw_scene(screen, snake, food, walls, needs_lines=False)
         state = get_screen(screen, device=device)
-        # 计算蛇头与食物之间的曼哈顿距离
-        distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
+        # 计算蛇头与食物之间的欧式距离（未开方）
+        distance = (snake.head().x - food.x) ** 2 + (snake.head().y - food.y) ** 2
 
         # snake move
         action = select_action(state)
@@ -117,16 +116,20 @@ def train():
         # 蛇没吃到食物且没有死亡
         if reward == 0:
             if food_down_count == 0:
-                # 食物消失
+                # 超时惩罚
                 reward = FOOD_DISAPPEAR_REWARD
+                food_down_count = FOOD_VALID_STEPS
             else:
-                # 计算蛇头与食物之间的曼哈顿距离
-                next_distance = abs(snake.head().x - food.x) + abs(snake.head().y - food.y)
+                # 计算蛇头与食物之间的欧式距离（未开方）
+                next_distance = (snake.head().x - food.x) ** 2 + (snake.head().y - food.y) ** 2
                 if next_distance < distance:
                     # 距离缩短
                     reward = SNAKE_CLOSE_TO_FOOD_REWARD
                 elif next_distance > distance:
                     # 距离拉长
+                    # reward = -SNAKE_CLOSE_TO_FOOD_REWARD + \
+                    #          (SNAKE_AWAY_FROM_FOOD_REWARD + SNAKE_CLOSE_TO_FOOD_REWARD) * \
+                    #          math.exp(-(len(snake) - 3) / 5)
                     reward = SNAKE_AWAY_FROM_FOOD_REWARD
                 else:
                     reward = 0.0
@@ -135,7 +138,7 @@ def train():
         reward_tensor = torch.tensor([reward], dtype=torch.float, device=device)
 
         # 生成新食物
-        if not food or food_down_count == 0:
+        if not food:  # or food_down_count == 0:
             food = gen_food(snake)
             food_down_count = FOOD_VALID_STEPS
 
@@ -149,7 +152,7 @@ def train():
 
         # 保存状态
         if not game_over:
-            if reward >= EAT_FOOD_REWARD:
+            if reward > 0:
                 good_memory.push(state, action, next_state, reward_tensor)
             else:
                 short_memory.push(state, action, next_state, reward_tensor)
@@ -159,8 +162,8 @@ def train():
         # 更新policy net
         optimize_model()
         # 超时退出
-        # if t > MAX_STEP:
-        #     game_over = True
+        if t > MAX_STEP:
+            game_over = True
 
         if game_over:
             snake_len.append(len(snake))
@@ -195,7 +198,7 @@ if __name__ == '__main__':
     snake_len = []  # 蛇长
     # 配置
     options = {
-        'restart_mem': True,
+        'restart_mem': False,
         'restart_models': False,
         'restart_optim': False,
         'random_clean_memory': False,
@@ -235,8 +238,6 @@ if __name__ == '__main__':
         if param_group['lr'] != BEGIN_LR:
             param_group['lr'] = BEGIN_LR
             break
-
-    steps_done = 0
 
     # 训练模型主循环
     for episode in range(NUM_EPISODES):

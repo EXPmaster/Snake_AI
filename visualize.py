@@ -11,9 +11,9 @@ def visualize():
     good_memory = memories['good'].memory
     bad_memory = memories['bad'].memory
     print(len(good_memory))
-    cur_state = good_memory[265].state
-    next_state = good_memory[265].next_state
-    print(good_memory[265].reward)
+    cur_state = good_memory[448].state
+    next_state = good_memory[448].next_state
+    print(good_memory[450].reward)
     cur_img = tensor2img(cur_state)
     next_img = tensor2img(next_state)
     if cur_img is not None:
