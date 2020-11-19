@@ -6,31 +6,37 @@
 ### Installation
 1. 新建Anaconda虚拟环境
 
-   ```
+   ```shell script
    conda create -n snake python=3.7 -y
    ```
    
 2. 激活环境
 
-   ```
+   ```shell script
    conda activate snake
    ```
 
 3. 安装pytorch, torchvision
 
-   ```
+   ```shell script
    conda install pytorch torchvision -c pytorch
+   ```
+   也可指定安装GPU版的pytorch（参考PyTorch官网）
+   
+   若安装太慢，可以尝试使用清华源镜像安装
+   ```shell script
+   conda install pytorch torchvision --channel https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/
    ```
 
 4. 安装依赖包
 
-   ```
+   ```shell script
    pip install -r requirements.txt
    ```
 
 5. 运行
 
-   ```
+   ```shell script
    python agent_play.py
    ```
    
